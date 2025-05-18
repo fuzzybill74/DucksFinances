@@ -1,0 +1,50 @@
+# Build stage
+FROM python:3.9-slim as builder
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --user -r requirements.txt
+
+# Runtime stage
+FROM python:3.9-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PATH="/root/.local/bin:$PATH"
+ENV FLASK_APP=app.py
+ENV FLASK_ENV=production
+
+# Create and set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Python dependencies from builder
+COPY --from=builder /root/.local /root/.local
+
+# Copy application code
+COPY . .
+
+# Create necessary directories
+RUN mkdir -p /app/static /app/uploads
+
+# Set permissions
+RUN chmod +x /app/entrypoint.sh
+
+# Expose the port the app runs on
+EXPOSE 5000
+
+# Run the application
+CMD ["./entrypoint.sh"]
